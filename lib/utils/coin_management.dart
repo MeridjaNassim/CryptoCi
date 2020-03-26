@@ -1,5 +1,4 @@
 import '../coin_data.dart';
-import '../coin_data.dart';
 import 'data_fetching.dart';
 
 const String base_api_url ='https://apiv2.bitcoinaverage.com/indices/global/ticker';
@@ -19,7 +18,7 @@ const String base_api_url ='https://apiv2.bitcoinaverage.com/indices/global/tick
       return null;
     }
   }
-  Future<void> _fetchData() async{
+  Future<void> _fetchAllData() async{
       for(String coin in cryptoList) {
         var map = loadedData.putIfAbsent(coin,()=>  new Map<String,double>() );
         for(String currency in currenciesList){
@@ -30,10 +29,55 @@ const String base_api_url ='https://apiv2.bitcoinaverage.com/indices/global/tick
       _dataloaded = true;
   }
   Future<void> loadData() async {
-     if(!_dataloaded) await _fetchData();
+     /// do not load all data ... load USD only; 
+     if(!_dataloaded){
+       await _loadUSD();
+     }
   }
-  double getValue(String coin , String currency){
+  
+  
+  Future<double> _getValue({String coin , String currency})async{
+    if(loadedData[coin] ==null || loadedData[coin][currency] == null) return await _getDataFor(coin : coin , currency : currency);
     return loadedData[coin][currency];
+  }
+  Future<dynamic> _getDataFor({String coin,String currency}) async {
+    dynamic data ;
+    if(coin != null && currency !=null) {
+      data = loadedData[coin];
+      if(data != null) {
+        var value = data[currency];
+        if(value != null) return value;
+        else {
+          data = await _getLiveData(coin, currency);
+          return data.putIfAbsent(currency, ()=>data['last']);
+        }
+      }else {
+        var map = loadedData.putIfAbsent(coin, ()=>Map<String,double>());
+        data = await _getLiveData(coin, currency);
+        return map.putIfAbsent(currency, ()=>data['last']);
+      }
+    }
+    return null;
+  }
+  Future<void> _loadUSD() async{
+    await _getDataFor(coin : 'BTC' , currency :'USD');
+    await _getDataFor(coin : 'ETH' , currency :'USD');
+    await _getDataFor(coin : 'LTC' , currency :'USD');
+  }
+
+  Future<void> populateData({String currency , Map<String,double> placeholder}) async{
+    for(String coin in cryptoList) {
+      var map = loadedData[coin];
+      if(map !=null) {
+        var value = map[currency];
+        if(value != null ) placeholder[coin] = value;
+        else {
+          value = await _getValue(currency: currency,coin : coin);
+          map[currency] = value ;
+          placeholder[coin] = value ;
+        }
+      } 
+    }
   }
 }
 
